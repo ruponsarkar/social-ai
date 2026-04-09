@@ -7,6 +7,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(4000),
   CLIENT_ORIGIN: z.string().default("http://localhost:5173"),
   SERVER_ORIGIN: z.string().default("http://localhost:4000"),
+  APP_TIMEZONE: z.string().default("Asia/Kolkata"),
   MYSQL_HOST: z.string().default("localhost"),
   MYSQL_PORT: z.coerce.number().default(3306),
   MYSQL_USER: z.string().default("root"),

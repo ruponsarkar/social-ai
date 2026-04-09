@@ -1,12 +1,11 @@
-import dayjs from "dayjs";
 import { pool } from "../../db/pool.js";
 import { generateContent } from "../ai/contentGenerator.js";
 import { publishToPlatform } from "../publishers/socialPublisher.js";
-import { computeNextRunAt } from "../../utils/date.js";
+import { computeNextRunAt, formatAppDateTime, getCurrentAppTime } from "../../utils/date.js";
 import type { ContentJob, Keyword, Platform } from "../../types/index.js";
 
 const getPendingJobs = async (): Promise<ContentJob[]> => {
-  const currentTime = dayjs().format("YYYY-MM-DD HH:mm:ss");
+  const currentTime = formatAppDateTime();
   const [rows] = await pool.query(
     `SELECT * FROM content_jobs
      WHERE status IN ('scheduled', 'failed')
@@ -47,7 +46,7 @@ const getAlreadyPublishedPlatforms = async (jobId: string): Promise<Platform[]> 
 
 export const processDueJobs = async () => {
   const jobs = await getPendingJobs();
-  console.log(`[scheduler] Found ${jobs.length} due job(s)`);
+  console.log(`[scheduler] Found ${jobs.length} due job(s) at ${formatAppDateTime()}`);
   let processed = 0;
   let failed = 0;
 
@@ -120,7 +119,7 @@ export const processDueJobs = async () => {
       }
 
       const nextRunAt = job.publish_every_other_day
-        ? computeNextRunAt(dayjs().format("YYYY-MM-DD HH:mm:ss"), true)
+        ? computeNextRunAt(getCurrentAppTime().format("YYYY-MM-DD HH:mm:ss"), true)
         : null;
 
       await pool.execute(
