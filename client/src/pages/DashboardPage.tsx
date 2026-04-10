@@ -209,6 +209,21 @@ export const DashboardPage = ({
         </button>
       </section>
 
+      <section className="card legal-links-card">
+        <strong>Meta app setup links</strong>
+        <div className="chip-list">
+          <a className="chip link-chip" href="/privacy-policy" target="_blank" rel="noreferrer">
+            Privacy Policy
+          </a>
+          <a className="chip link-chip" href="/data-deletion" target="_blank" rel="noreferrer">
+            Data Deletion
+          </a>
+          <a className="chip link-chip" href="/terms-of-service" target="_blank" rel="noreferrer">
+            Terms of Service
+          </a>
+        </div>
+      </section>
+
       {oauthMessage ? (
         <section className="card">
           <strong>{oauthMessage}</strong>
