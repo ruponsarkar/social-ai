@@ -45,6 +45,15 @@ export const DashboardPage = ({
 }: DashboardPageProps) => {
   const APP_TIMEZONE = "Asia/Kolkata";
   const JOBS_PER_PAGE = 10;
+  const appDateFormatter = new Intl.DateTimeFormat("en-IN", {
+    timeZone: APP_TIMEZONE,
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  });
   const parseAiPayload = (value?: string | null) => {
     if (!value) {
       return null;
@@ -90,22 +99,24 @@ export const DashboardPage = ({
   const [jobDetailsPage, setJobDetailsPage] = useState(1);
   const [openJobId, setOpenJobId] = useState<string | null>(null);
 
-  const formatInAppTimezone = (value: string) => {
+  const formatUtcTimestampToAppTimezone = (value: string) => {
     if (!value) {
       return "";
     }
 
-    const hasExplicitTimezone = /(?:z|[+-]\d{2}:\d{2})$/i.test(value);
-    if (hasExplicitTimezone) {
-      return new Intl.DateTimeFormat("en-IN", {
-        timeZone: APP_TIMEZONE,
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true
-      }).format(new Date(value));
+    const normalized = value.replace("T", " ").replace("Z", "");
+    const [datePart, timePart = "00:00:00"] = normalized.split(" ");
+    const [year, month, day] = datePart.split("-").map(Number);
+    const [hourValue = 0, minuteValue = 0, secondValue = 0] = timePart.split(":").map(Number);
+
+    return appDateFormatter.format(
+      new Date(Date.UTC(year, Math.max(month - 1, 0), day, hourValue, minuteValue, secondValue))
+    );
+  };
+
+  const formatAppLocalDateTime = (value: string) => {
+    if (!value) {
+      return "";
     }
 
     const normalized = value.replace("T", " ");
@@ -125,8 +136,8 @@ export const DashboardPage = ({
     return `${day} ${monthLabel} ${year}, ${hour12}:${minute} ${meridiem}`;
   };
 
-  const formatScheduledAt = (value: string) => formatInAppTimezone(value);
-  const formatCreatedAt = (value: string) => formatInAppTimezone(value);
+  const formatScheduledAt = (value: string) => formatAppLocalDateTime(value);
+  const formatCreatedAt = (value: string) => formatUtcTimestampToAppTimezone(value);
 
   useEffect(() => {
     const url = new URL(window.location.href);
