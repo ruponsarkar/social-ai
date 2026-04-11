@@ -2,6 +2,8 @@ import type { Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
 import { pool } from "../db/pool.js";
 import { processDueJobs } from "../services/scheduler/jobProcessor.js";
+import { normalizeRepeatInterval } from "../utils/date.js";
+import type { RepeatInterval } from "../types/index.js";
 
 export const getJobs = async (_req: Request, res: Response) => {
   const [rows] = await pool.query("SELECT * FROM content_jobs ORDER BY scheduled_at ASC");
@@ -20,6 +22,7 @@ export const createJob = async (req: Request, res: Response) => {
     promptTemplate,
     scheduledAt,
     publishEveryOtherDay,
+    repeatInterval,
     keywordIds
   } = req.body as {
     title: string;
@@ -28,15 +31,17 @@ export const createJob = async (req: Request, res: Response) => {
     promptTemplate: string;
     scheduledAt: string;
     publishEveryOtherDay: boolean;
+    repeatInterval?: RepeatInterval;
     keywordIds: number[];
   };
 
   const id = uuidv4();
+  const normalizedRepeatInterval = normalizeRepeatInterval(repeatInterval, publishEveryOtherDay);
 
   await pool.execute(
     `INSERT INTO content_jobs
-     (id, title, content_type, target_platforms, status, prompt_template, scheduled_at, publish_every_other_day, next_run_at)
-     VALUES (?, ?, ?, ?, 'scheduled', ?, ?, ?, ?)`,
+     (id, title, content_type, target_platforms, status, prompt_template, scheduled_at, publish_every_other_day, repeat_interval, next_run_at)
+     VALUES (?, ?, ?, ?, 'scheduled', ?, ?, ?, ?, ?)`,
     [
       id,
       title,
@@ -44,7 +49,8 @@ export const createJob = async (req: Request, res: Response) => {
       JSON.stringify(targetPlatforms),
       promptTemplate,
       scheduledAt,
-      publishEveryOtherDay ? 1 : 0,
+      normalizedRepeatInterval === "every_other_day" ? 1 : 0,
+      normalizedRepeatInterval === "none" ? null : normalizedRepeatInterval,
       scheduledAt
     ]
   );

@@ -195,6 +195,45 @@ select {
   color: #15202b;
 }
 
+.accordion-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.accordion-toggle {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 22px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.accordion-toggle span {
+  display: grid;
+  gap: 4px;
+}
+
+.accordion-toggle small {
+  color: #476072;
+}
+
+.accordion-content {
+  padding: 0 22px 22px;
+}
+
+.pagination {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
 .legal-links-card {
   margin-bottom: 20px;
 }

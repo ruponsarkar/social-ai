@@ -1,6 +1,8 @@
 import { FormEvent, Fragment, useEffect, useState } from "react";
 import { api } from "../lib/api";
 
+type RepeatInterval = "none" | "every_3_hours" | "every_day" | "every_other_day";
+
 type DashboardPageProps = {
   stats: {
     totalKeywords: number;
@@ -15,7 +17,14 @@ type DashboardPageProps = {
     content_type: "text" | "image" | "video";
     status: string;
     scheduled_at: string;
+    created_at: string;
     target_platforms: string[];
+    prompt_template: string;
+    generated_text?: string | null;
+    generated_image_url?: string | null;
+    generated_video_url?: string | null;
+    ai_source?: string | null;
+    ai_response_payload?: string | null;
     error_message?: string | null;
   }>;
   connections: Array<{
@@ -34,13 +43,47 @@ export const DashboardPage = ({
   connections,
   onRefresh
 }: DashboardPageProps) => {
+  const APP_TIMEZONE = "Asia/Kolkata";
+  const JOBS_PER_PAGE = 10;
+  const appDateFormatter = new Intl.DateTimeFormat("en-IN", {
+    timeZone: APP_TIMEZONE,
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  });
+  const parseAiPayload = (value?: string | null) => {
+    if (!value) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(value) as {
+        response?: {
+          data?: {
+            source?: string;
+            sources?: Array<{
+              type?: string;
+              label?: string;
+              uri?: string | null;
+            }>;
+          };
+        };
+      };
+    } catch {
+      return null;
+    }
+  };
+
   const [keywordForm, setKeywordForm] = useState({ keyword: "", category: "" });
   const [jobForm, setJobForm] = useState({
     title: "",
     contentType: "text",
     promptTemplate: "",
     scheduledAt: "",
-    publishEveryOtherDay: false,
+    repeatInterval: "none" as RepeatInterval,
     keywordIds: [] as number[],
     targetPlatforms: ["facebook"] as string[]
   });
@@ -53,16 +96,48 @@ export const DashboardPage = ({
     channelId: ""
   });
   const [oauthMessage, setOauthMessage] = useState("");
+  const [jobDetailsPage, setJobDetailsPage] = useState(1);
+  const [openJobId, setOpenJobId] = useState<string | null>(null);
 
-  const formatScheduledAt = (value: string) =>
-    new Date(value.replace(" ", "T")).toLocaleString([], {
-      year: "numeric",
+  const formatUtcTimestampToAppTimezone = (value: string) => {
+    if (!value) {
+      return "";
+    }
+
+    const normalized = value.replace("T", " ").replace("Z", "");
+    const [datePart, timePart = "00:00:00"] = normalized.split(" ");
+    const [year, month, day] = datePart.split("-").map(Number);
+    const [hourValue = 0, minuteValue = 0, secondValue = 0] = timePart.split(":").map(Number);
+
+    return appDateFormatter.format(
+      new Date(Date.UTC(year, Math.max(month - 1, 0), day, hourValue, minuteValue, secondValue))
+    );
+  };
+
+  const formatAppLocalDateTime = (value: string) => {
+    if (!value) {
+      return "";
+    }
+
+    const normalized = value.replace("T", " ");
+    const [datePart, timePart = "00:00:00"] = normalized.split(" ");
+    const [year, month, day] = datePart.split("-").map(Number);
+    const [hourValue = 0, minuteValue = 0] = timePart.split(":").map(Number);
+
+    const monthLabel = new Intl.DateTimeFormat("en-IN", {
       month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true 
-    });
+      timeZone: APP_TIMEZONE
+    }).format(new Date(Date.UTC(year, Math.max(month - 1, 0), day)));
+
+    const hour12 = hourValue % 12 || 12;
+    const minute = String(minuteValue).padStart(2, "0");
+    const meridiem = hourValue >= 12 ? "pm" : "am";
+
+    return `${day} ${monthLabel} ${year}, ${hour12}:${minute} ${meridiem}`;
+  };
+
+  const formatScheduledAt = (value: string) => formatAppLocalDateTime(value);
+  const formatCreatedAt = (value: string) => formatUtcTimestampToAppTimezone(value);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -76,6 +151,16 @@ export const DashboardPage = ({
     }
   }, []);
 
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(jobs.length / JOBS_PER_PAGE));
+    if (jobDetailsPage > totalPages) {
+      setJobDetailsPage(totalPages);
+    }
+  }, [jobDetailsPage, jobs.length]);
+
+  const totalJobPages = Math.max(1, Math.ceil(jobs.length / JOBS_PER_PAGE));
+  const pagedJobs = jobs.slice((jobDetailsPage - 1) * JOBS_PER_PAGE, jobDetailsPage * JOBS_PER_PAGE);
+
   const submitKeyword = async (event: FormEvent) => {
     event.preventDefault();
     await api.post("/keywords", keywordForm);
@@ -87,6 +172,7 @@ export const DashboardPage = ({
     event.preventDefault();
     await api.post("/jobs", {
       ...jobForm,
+      publishEveryOtherDay: jobForm.repeatInterval === "every_other_day",
       scheduledAt: jobForm.scheduledAt.replace("T", " ") + ":00"
     });
     setJobForm({
@@ -94,7 +180,7 @@ export const DashboardPage = ({
       contentType: "text",
       promptTemplate: "",
       scheduledAt: "",
-      publishEveryOtherDay: false,
+      repeatInterval: "none",
       keywordIds: [],
       targetPlatforms: ["facebook"]
     });
@@ -305,14 +391,15 @@ export const DashboardPage = ({
               onChange={(event) => setJobForm({ ...jobForm, scheduledAt: event.target.value })}
               required
             />
-            <label className="toggle">
-              <input
-                type="checkbox"
-                checked={jobForm.publishEveryOtherDay}
-                onChange={(event) => setJobForm({ ...jobForm, publishEveryOtherDay: event.target.checked })}
-              />
-              Post every alternate day
-            </label>
+            <select
+              value={jobForm.repeatInterval}
+              onChange={(event) => setJobForm({ ...jobForm, repeatInterval: event.target.value as RepeatInterval })}
+            >
+              <option value="none">Post once</option>
+              <option value="every_3_hours">Post Every 3 hours</option>
+              <option value="every_day">Post Every day</option>
+              <option value="every_other_day">Post every alternate day</option>
+            </select>
 
             <div>
               <p className="subheading">Platforms</p>
@@ -419,7 +506,7 @@ export const DashboardPage = ({
             <span>Scheduled</span>
             <span>Action</span>
           </div>
-          {jobs.map((job) => (
+          {pagedJobs.map((job) => (
             <Fragment key={job.id}>
               <div className="table-row">
                 <span>{job.title}</span>
@@ -449,6 +536,130 @@ export const DashboardPage = ({
               ) : null}
             </Fragment>
           ))}
+        </div>
+        <div className="pagination">
+          <button
+            type="button"
+            className="chip"
+            onClick={() => setJobDetailsPage((current) => Math.max(1, current - 1))}
+            disabled={jobDetailsPage === 1}
+          >
+            Previous
+          </button>
+          <span>
+            Page {jobDetailsPage} of {totalJobPages}
+          </span>
+          <button
+            type="button"
+            className="chip"
+            onClick={() => setJobDetailsPage((current) => Math.min(totalJobPages, current + 1))}
+            disabled={jobDetailsPage === totalJobPages}
+          >
+            Next
+          </button>
+        </div>
+      </section>
+
+      <section className="card">
+        <h2>Job Details</h2>
+        <div className="connection-list">
+          {pagedJobs.map((job) => {
+            const payload = parseAiPayload(job.ai_response_payload);
+            const sources = payload?.response?.data?.sources || [];
+            const isOpen = openJobId === job.id;
+
+            return (
+              <div key={`${job.id}-details`} className="card accordion-card">
+                <button
+                  type="button"
+                  className="accordion-toggle"
+                  onClick={() => setOpenJobId((current) => current === job.id ? null : job.id)}
+                >
+                  <span>
+                    <strong>{job.title}</strong>
+                    <small>
+                      {job.status} • {formatCreatedAt(job.created_at)}
+                    </small>
+                  </span>
+                  <span>{isOpen ? "Hide" : "Show"}</span>
+                </button>
+                {isOpen ? (
+                  <div className="accordion-content">
+                   
+                    <div className="stack">
+                      <strong>Prompt Template</strong>
+                      <p>{job.prompt_template}</p>
+                    </div>
+                    <div className="stack">
+                      <strong>Generated Content</strong>
+                      <p>{job.generated_text || job.generated_image_url || job.generated_video_url || "Not generated yet"}</p>
+                    </div>
+                     <div className="list-row">
+                      <span>Status</span>
+                      <span>{job.status}</span>
+                    </div>
+                    {/* <div className="list-row">
+                      <span>Created</span>
+                      <span>{formatCreatedAt(job.created_at)}</span>
+                    </div> */}
+                    <div className="list-row">
+                      <span>Scheduled</span>
+                      <span>{formatScheduledAt(job.scheduled_at)}</span>
+                    </div>
+                    <div className="list-row">
+                      <span>Source</span>
+                      <span>{job.ai_source || payload?.response?.data?.source || "N/A"}</span>
+                    </div>
+                    {sources.length ? (
+                      <div className="stack">
+                        <strong>Sources</strong>
+                        <div className="chip-list">
+                          {sources.map((source, index) => (
+                            source.uri ? (
+                              <a
+                                key={`${job.id}-source-link-${index}`}
+                                className="chip link-chip"
+                                href={source.uri}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {source.label || source.uri}
+                              </a>
+                            ) : (
+                              <span key={`${job.id}-source-label-${index}`} className="chip">
+                                {source.label || source.type || "Unknown source"}
+                              </span>
+                            )
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+        <div className="pagination">
+          <button
+            type="button"
+            className="chip"
+            onClick={() => setJobDetailsPage((current) => Math.max(1, current - 1))}
+            disabled={jobDetailsPage === 1}
+          >
+            Previous
+          </button>
+          <span>
+            Page {jobDetailsPage} of {totalJobPages}
+          </span>
+          <button
+            type="button"
+            className="chip"
+            onClick={() => setJobDetailsPage((current) => Math.min(totalJobPages, current + 1))}
+            disabled={jobDetailsPage === totalJobPages}
+          >
+            Next
+          </button>
         </div>
       </section>
     </div>
