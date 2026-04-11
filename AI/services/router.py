@@ -45,14 +45,42 @@ def is_datetime_query(text: str):
         "year", "tomorrow", "next", "after"
     ])
 
-def route_query(user_message: str):
+def resolve_query(user_message: str):
     api_result = match_api_response(user_message)
     if api_result:
-        return api_result
+        return {
+            "text": api_result,
+            "source": "local_api",
+            "sources": [
+                {
+                    "type": "local_api",
+                    "label": API_URL,
+                    "uri": API_URL,
+                }
+            ],
+        }
 
     if is_datetime_query(user_message):
         result = handle_datetime_query(user_message)
         if result:
-            return result
+            return {
+                "text": result,
+                "source": "datetime_tool",
+                "sources": [
+                    {
+                        "type": "datetime_tool",
+                        "label": "Local datetime tool",
+                        "uri": None,
+                    }
+                ],
+            }
+
+    return None
+
+
+def route_query(user_message: str):
+    resolved = resolve_query(user_message)
+    if resolved:
+        return resolved["text"]
 
     return None
