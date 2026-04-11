@@ -22,7 +22,15 @@ type Job = {
   content_type: "text" | "image" | "video";
   status: string;
   scheduled_at: string;
+  created_at: string;
   target_platforms: string[];
+  prompt_template: string;
+  generated_text?: string | null;
+  generated_image_url?: string | null;
+  generated_video_url?: string | null;
+  ai_source?: string | null;
+  ai_response_payload?: string | null;
+  error_message?: string | null;
 };
 
 type Connection = {

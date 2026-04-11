@@ -1,7 +1,7 @@
 import { pool } from "../../db/pool.js";
 import { generateContent } from "../ai/contentGenerator.js";
 import { publishToPlatform } from "../publishers/socialPublisher.js";
-import { computeNextRunAt, formatAppDateTime, getCurrentAppTime } from "../../utils/date.js";
+import { computeNextRunAt, formatAppDateTime } from "../../utils/date.js";
 import type { ContentJob, Keyword, Platform } from "../../types/index.js";
 
 const getPendingJobs = async (): Promise<ContentJob[]> => {
@@ -69,12 +69,14 @@ export const processDueJobs = async () => {
 
       await pool.execute(
         `UPDATE content_jobs
-         SET generated_text = ?, generated_image_url = ?, generated_video_url = ?
+         SET generated_text = ?, generated_image_url = ?, generated_video_url = ?, ai_source = ?, ai_response_payload = ?
          WHERE id = ?`,
         [
           generated.text ?? null,
           generated.imageUrl ?? null,
           generated.videoUrl ?? null,
+          generated.aiSource ?? null,
+          generated.aiResponsePayload ? JSON.stringify(generated.aiResponsePayload) : null,
           job.id
         ]
       );
@@ -118,15 +120,18 @@ export const processDueJobs = async () => {
         );
       }
 
-      const nextRunAt = job.publish_every_other_day
-        ? computeNextRunAt(getCurrentAppTime().format("YYYY-MM-DD HH:mm:ss"), true)
-        : null;
+      const nextRunAt = computeNextRunAt(
+        formatAppDateTime(),
+        job.repeat_interval,
+        job.publish_every_other_day
+      );
+      const hasRepeat = Boolean(nextRunAt);
 
       await pool.execute(
         `UPDATE content_jobs
          SET status = ?, last_run_at = NOW(), next_run_at = ?, scheduled_at = COALESCE(?, scheduled_at)
          WHERE id = ?`,
-        [job.publish_every_other_day ? "scheduled" : "published", nextRunAt, nextRunAt, job.id]
+        [hasRepeat ? "scheduled" : "published", nextRunAt, nextRunAt, job.id]
       );
       processed += 1;
     } catch (error) {

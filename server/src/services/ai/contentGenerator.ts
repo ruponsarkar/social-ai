@@ -9,10 +9,19 @@ interface GenerateContentInput {
   contentType: ContentType;
 }
 
+interface AiSourceReference {
+  type: string;
+  label: string;
+  uri?: string | null;
+}
+
 interface GeneratedContent {
   text?: string;
   imageUrl?: string;
   videoUrl?: string;
+  aiSource?: string;
+  aiSources?: AiSourceReference[];
+  aiResponsePayload?: unknown;
 }
 
 interface AiServiceResponse {
@@ -22,6 +31,9 @@ interface AiServiceResponse {
     caption?: string;
     hashtags?: string[];
     content_type?: string;
+    source?: string;
+    sources?: AiSourceReference[];
+    raw_response?: string;
   };
 }
 
@@ -48,9 +60,14 @@ const generateTextFromAiService = async (input: GenerateContentInput) => {
     timeout: 30000
   });
 
+  console.log("response : ", response.data);
+  
+
   const text = response.data?.data?.text || response.data?.ai;
   const caption = response.data?.data?.caption;
   const hashtags = response.data?.data?.hashtags || [];
+  const aiSource = response.data?.data?.source;
+  const aiSources = response.data?.data?.sources || [];
 
   if (!text) {
     throw new Error("AI service returned an empty text response");
@@ -59,8 +76,19 @@ const generateTextFromAiService = async (input: GenerateContentInput) => {
   const hashtagsText = hashtags.length > 0 ? `\n\n${hashtags.map((tag) => tag.startsWith("#") ? tag : `#${tag}`).join(" ")}` : "";
 
   return {
-    text: `${caption ? `${caption}\n\n` : ""} ${text}${hashtagsText}`.trim()
-    // text: `${text}${caption ? `\n\n${caption}` : ""}${hashtagsText}`.trim()
+    text: `${caption ? `${caption}\n\n` : ""} ${text}${hashtagsText}`.trim(),
+    aiSource: aiSource || "gemini",
+    aiSources,
+    aiResponsePayload: {
+      provider: "gemini",
+      request: {
+        title: input.title,
+        promptTemplate: input.promptTemplate,
+        keywords: input.keywords,
+        contentType: input.contentType
+      },
+      response: response.data
+    }
   };
 };
 
@@ -82,25 +110,57 @@ export const generateContent = async (input: GenerateContentInput): Promise<Gene
     if (input.contentType === "video") {
       return {
         text: `Short video script about ${keywordsText}. Hook the audience in 3 seconds, deliver one practical insight, then end with a CTA.`,
-        videoUrl: "https://example.com/mock-short-video.mp4"
+        videoUrl: "https://example.com/mock-short-video.mp4",
+        aiSource: "mock",
+        aiResponsePayload: {
+          provider: "mock",
+          request: input,
+          response: {
+            text: `Short video script about ${keywordsText}. Hook the audience in 3 seconds, deliver one practical insight, then end with a CTA.`
+          }
+        }
       };
     }
 
     if (input.contentType === "image") {
       return {
         text: `Caption generated from keywords: ${keywordsText}.`,
-        imageUrl: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80"
+        imageUrl: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80",
+        aiSource: "mock",
+        aiResponsePayload: {
+          provider: "mock",
+          request: input,
+          response: {
+            text: `Caption generated from keywords: ${keywordsText}.`
+          }
+        }
       };
     }
 
     return {
-      text: `${baseText}\n\nGenerated social post:\nBuild trust with consistent content, clear messaging, and one actionable tip your audience can use today.`
+      text: `${baseText}\n\nGenerated social post:\nBuild trust with consistent content, clear messaging, and one actionable tip your audience can use today.`,
+      aiSource: "mock",
+      aiResponsePayload: {
+        provider: "mock",
+        request: input,
+        response: {
+          text: `${baseText}\n\nGenerated social post:\nBuild trust with consistent content, clear messaging, and one actionable tip your audience can use today.`
+        }
+      }
     };
   }
 
   return {
     text: `${baseText}\n\nConfigure a real AI provider in server/src/services/ai/contentGenerator.ts`,
     imageUrl: input.contentType === "image" ? "https://example.com/replace-with-real-image-url.jpg" : undefined,
-    videoUrl: input.contentType === "video" ? "https://example.com/replace-with-real-video-url.mp4" : undefined
+    videoUrl: input.contentType === "video" ? "https://example.com/replace-with-real-video-url.mp4" : undefined,
+    aiSource: "unconfigured",
+    aiResponsePayload: {
+      provider: "unconfigured",
+      request: input,
+      response: {
+        text: `${baseText}\n\nConfigure a real AI provider in server/src/services/ai/contentGenerator.ts`
+      }
+    }
   };
 };
