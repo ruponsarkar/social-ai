@@ -1,3 +1,4 @@
+import axios from "axios";
 import { env } from "../../config/env.js";
 import type { ContentType } from "../../types/index.js";
 
@@ -14,11 +15,67 @@ interface GeneratedContent {
   videoUrl?: string;
 }
 
+interface AiServiceResponse {
+  ai?: string;
+  data?: {
+    text?: string;
+    caption?: string;
+    hashtags?: string[];
+    content_type?: string;
+  };
+}
+
 const joinKeywords = (keywords: string[]) => keywords.length ? keywords.join(", ") : "general growth";
+
+const buildTextPrompt = (input: GenerateContentInput) => {
+  const keywordsText = joinKeywords(input.keywords);
+
+  return [
+    `Create a ${input.contentType} social media post for our platform.`,
+    `Title: ${input.title}`,
+    `Keywords: ${keywordsText}`,
+    `Requirements: ${input.promptTemplate}`,
+    "Write final publish-ready copy in a clear, engaging, human tone."
+  ].join("\n");
+};
+
+const generateTextFromAiService = async (input: GenerateContentInput) => {
+  const response = await axios.post<AiServiceResponse>(`${env.AI_SERVICE_URL}/chat`, {
+    session_id: `job-${input.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    message: buildTextPrompt(input)
+  }, {
+    timeout: 30000
+  });
+
+  const text = response.data?.data?.text || response.data?.ai;
+  const caption = response.data?.data?.caption;
+  const hashtags = response.data?.data?.hashtags || [];
+
+  if (!text) {
+    throw new Error("AI service returned an empty text response");
+  }
+
+  const hashtagsText = hashtags.length > 0 ? `\n\n${hashtags.map((tag) => tag.startsWith("#") ? tag : `#${tag}`).join(" ")}` : "";
+
+  return {
+    text: `${text}${caption ? `\n\n${caption}` : ""}${hashtagsText}`.trim()
+  };
+};
 
 export const generateContent = async (input: GenerateContentInput): Promise<GeneratedContent> => {
   const keywordsText = joinKeywords(input.keywords);
   const baseText = `Title: ${input.title}\nFocus keywords: ${keywordsText}\nPrompt: ${input.promptTemplate}`;
+
+  if (env.AI_TEXT_PROVIDER !== "mock" && input.contentType === "text") {
+    try {
+      console.log("creating text from gemini ");
+      
+      return await generateTextFromAiService(input);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown AI service error";
+      console.error(`[ai] Falling back to mock text generation: ${message}`);
+    }
+  }
 
   if (env.AI_TEXT_PROVIDER === "mock" || env.AI_IMAGE_PROVIDER === "mock" || env.AI_VIDEO_PROVIDER === "mock") {
     if (input.contentType === "video") {
@@ -46,4 +103,3 @@ export const generateContent = async (input: GenerateContentInput): Promise<Gene
     videoUrl: input.contentType === "video" ? "https://example.com/replace-with-real-video-url.mp4" : undefined
   };
 };
-

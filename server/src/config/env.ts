@@ -14,6 +14,7 @@ const envSchema = z.object({
   MYSQL_PASSWORD: z.string().default("password"),
   MYSQL_DATABASE: z.string().default("social_media_manager"),
   AI_TEXT_PROVIDER: z.string().default("mock"),
+  AI_SERVICE_URL: z.string().default("http://127.0.0.1:8000"),
   AI_IMAGE_PROVIDER: z.string().default("mock"),
   AI_VIDEO_PROVIDER: z.string().default("mock"),
   OPENAI_API_KEY: z.string().optional(),
