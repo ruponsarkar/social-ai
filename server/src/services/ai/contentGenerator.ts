@@ -42,7 +42,8 @@ const buildTextPrompt = (input: GenerateContentInput) => {
 const generateTextFromAiService = async (input: GenerateContentInput) => {
   const response = await axios.post<AiServiceResponse>(`${env.AI_SERVICE_URL}/chat`, {
     session_id: `job-${input.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-    message: buildTextPrompt(input)
+    // message: buildTextPrompt(input)
+    message: input.promptTemplate
   }, {
     timeout: 30000
   });
@@ -69,7 +70,6 @@ export const generateContent = async (input: GenerateContentInput): Promise<Gene
   if (env.AI_TEXT_PROVIDER !== "mock" && input.contentType === "text") {
     try {
       console.log("creating text from gemini ");
-      
       return await generateTextFromAiService(input);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown AI service error";
