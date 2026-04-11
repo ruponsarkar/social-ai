@@ -1,8 +1,9 @@
 import os
 import json
 from google import genai
+from google.genai import types
 from dotenv import load_dotenv
-from services.router import route_query
+from services.router import resolve_query
 
 
 load_dotenv()
@@ -78,36 +79,110 @@ def _extract_json_response(raw_text: str):
     }
 
 
-def generate_response(session_id: str, user_message: str):
-    chat = _get_or_create_chat(session_id)
+def _normalize_source(uri, title=None, source_type="web"):
+    if not uri and not title:
+        return None
 
-    routed = route_query(user_message)
-    if routed:
-        return {
-            "text": str(routed),
-            "caption": str(routed),
-            "hashtags": [],
-            "content_type": "text",
-            "raw_response": str(routed)
-        }
+    return {
+        "type": source_type,
+        "label": title or uri or source_type,
+        "uri": uri,
+    }
 
+
+def _extract_grounded_sources(response):
+    candidates = getattr(response, "candidates", None) or []
+    if not candidates:
+        return []
+
+    grounding_metadata = getattr(candidates[0], "grounding_metadata", None)
+    if grounding_metadata is None and isinstance(candidates[0], dict):
+        grounding_metadata = candidates[0].get("grounding_metadata")
+
+    if not grounding_metadata:
+        return []
+
+    chunks = getattr(grounding_metadata, "grounding_chunks", None)
+    if chunks is None and isinstance(grounding_metadata, dict):
+        chunks = grounding_metadata.get("grounding_chunks", [])
+
+    sources = []
+    seen = set()
+
+    for chunk in chunks or []:
+        web = getattr(chunk, "web", None)
+        if web is None and isinstance(chunk, dict):
+            web = chunk.get("web")
+
+        if not web:
+            continue
+
+        uri = getattr(web, "uri", None)
+        title = getattr(web, "title", None)
+
+        if isinstance(web, dict):
+            uri = web.get("uri", uri)
+            title = web.get("title", title)
+
+        key = (uri, title)
+        if key in seen:
+            continue
+
+        normalized = _normalize_source(uri=uri, title=title, source_type="google_search")
+        if normalized:
+            sources.append(normalized)
+            seen.add(key)
+
+    return sources
+
+
+def _grounded_generate(user_message: str):
+    grounding_tool = types.Tool(google_search=types.GoogleSearch())
     prompt = (
         f"{SOCIAL_MEDIA_TEXT_SYSTEM_PROMPT}\n\n"
+        "Use Google Search when needed to research the request and improve factual accuracy. "
+        "When web research is used, rely on the grounded search results.\n\n"
         f"User request:\n{user_message}"
     )
 
-    response = chat.send_message(prompt)
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            tools=[grounding_tool]
+        ),
+    )
 
-    return _extract_json_response(response.text)
+    parsed = _extract_json_response(response.text)
+    sources = _extract_grounded_sources(response)
+    parsed["source"] = "gemini_google_search" if sources else "gemini"
+    parsed["sources"] = sources
+    return parsed
+
+
+def generate_response(session_id: str, user_message: str):
+    routed = resolve_query(user_message)
+    if routed:
+        return {
+            "text": str(routed["text"]),
+            "caption": str(routed["text"]),
+            "hashtags": [],
+            "content_type": "text",
+            "raw_response": str(routed["text"]),
+            "source": routed["source"],
+            "sources": routed["sources"],
+        }
+
+    return _grounded_generate(user_message)
 
 
 def stream_response(session_id: str, user_message: str):
     chat = _get_or_create_chat(session_id)
-    tool_result = route_query(user_message)
+    tool_result = resolve_query(user_message)
 
     if tool_result:
         response = chat.send_message_stream(
-            f"User asked: {user_message}\nAnswer: {tool_result}\nMake it conversational, don't modify the answer."
+            f"User asked: {user_message}\nAnswer: {tool_result['text']}\nMake it conversational, don't modify the answer."
         )
         for chunk in response:
             if chunk.text:

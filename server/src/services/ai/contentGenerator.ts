@@ -59,7 +59,8 @@ const generateTextFromAiService = async (input: GenerateContentInput) => {
   const hashtagsText = hashtags.length > 0 ? `\n\n${hashtags.map((tag) => tag.startsWith("#") ? tag : `#${tag}`).join(" ")}` : "";
 
   return {
-    text: `${text}${caption ? `\n\n${caption}` : ""}${hashtagsText}`.trim()
+    text: `${caption ? `${caption}\n\n` : ""} ${text}${hashtagsText}`.trim()
+    // text: `${text}${caption ? `\n\n${caption}` : ""}${hashtagsText}`.trim()
   };
 };
 
