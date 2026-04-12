@@ -1,8 +1,8 @@
 import { pool } from "../../db/pool.js";
 import { generateContent } from "../ai/contentGenerator.js";
 import { publishToPlatform } from "../publishers/socialPublisher.js";
-import { computeNextRunAt, formatAppDateTime } from "../../utils/date.js";
-import type { ContentJob, Keyword, Platform } from "../../types/index.js";
+import { computeNextRunAt, formatAppDateTime, normalizeRepeatInterval } from "../../utils/date.js";
+import type { ContentJob, Keyword, Platform, RepeatInterval } from "../../types/index.js";
 
 const getPendingJobs = async (): Promise<ContentJob[]> => {
   const currentTime = formatAppDateTime();
@@ -82,7 +82,12 @@ export const processDueJobs = async () => {
       );
 
       const platforms = job.target_platforms as Platform[];
-      const alreadyPublishedPlatforms = await getAlreadyPublishedPlatforms(job.id);
+      const repeatInterval = normalizeRepeatInterval(
+        job.repeat_interval as RepeatInterval | null,
+        job.publish_every_other_day
+      );
+      const isRecurringJob = repeatInterval !== "none";
+      const alreadyPublishedPlatforms = isRecurringJob ? [] : await getAlreadyPublishedPlatforms(job.id);
       const pendingPlatforms = platforms.filter((platform) => !alreadyPublishedPlatforms.includes(platform));
       const publishResults = [];
 
@@ -122,7 +127,7 @@ export const processDueJobs = async () => {
 
       const nextRunAt = computeNextRunAt(
         formatAppDateTime(),
-        job.repeat_interval,
+        repeatInterval,
         job.publish_every_other_day
       );
       const hasRepeat = Boolean(nextRunAt);
