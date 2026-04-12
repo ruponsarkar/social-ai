@@ -8,11 +8,17 @@ const getPendingJobs = async (): Promise<ContentJob[]> => {
   const currentTime = formatAppDateTime();
   const [rows] = await pool.query(
     `SELECT * FROM content_jobs
-     WHERE status IN ('scheduled', 'failed')
-     AND scheduled_at <= ?
-     ORDER BY scheduled_at ASC`
+     WHERE (
+       status IN ('scheduled', 'failed')
+       AND scheduled_at <= ?
+     ) OR (
+       status <> 'processing'
+       AND (repeat_interval IS NOT NULL OR publish_every_other_day = 1)
+       AND COALESCE(next_run_at, scheduled_at) <= ?
+     )
+     ORDER BY COALESCE(next_run_at, scheduled_at) ASC`
     ,
-    [currentTime]
+    [currentTime, currentTime]
   );
 
   return (rows as Array<Record<string, unknown>>).map((row) => ({
@@ -90,13 +96,19 @@ export const processDueJobs = async () => {
       const alreadyPublishedPlatforms = isRecurringJob ? [] : await getAlreadyPublishedPlatforms(job.id);
       const pendingPlatforms = platforms.filter((platform) => !alreadyPublishedPlatforms.includes(platform));
       const publishResults = [];
+      const nextRunAt = computeNextRunAt(
+        formatAppDateTime(),
+        repeatInterval,
+        job.publish_every_other_day
+      );
+      const hasRepeat = Boolean(nextRunAt);
 
       if (pendingPlatforms.length === 0) {
         await pool.execute(
           `UPDATE content_jobs
-           SET status = 'published', last_run_at = COALESCE(last_run_at, NOW())
+           SET status = ?, last_run_at = COALESCE(last_run_at, NOW()), next_run_at = ?, scheduled_at = COALESCE(?, scheduled_at)
            WHERE id = ?`,
-          [job.id]
+          [hasRepeat ? "scheduled" : "published", nextRunAt, nextRunAt, job.id]
         );
         processed += 1;
         continue;
@@ -124,13 +136,6 @@ export const processDueJobs = async () => {
             .join(" | ")
         );
       }
-
-      const nextRunAt = computeNextRunAt(
-        formatAppDateTime(),
-        repeatInterval,
-        job.publish_every_other_day
-      );
-      const hasRepeat = Boolean(nextRunAt);
 
       await pool.execute(
         `UPDATE content_jobs
