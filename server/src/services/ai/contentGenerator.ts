@@ -52,6 +52,8 @@ const buildTextPrompt = (input: GenerateContentInput) => {
 };
 
 const generateTextFromAiService = async (input: GenerateContentInput) => {
+  console.log("session_id : ", `job-${input.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`);
+  
   const response = await axios.post<AiServiceResponse>(`${env.AI_SERVICE_URL}/chat`, {
     session_id: `job-${input.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
     // message: buildTextPrompt(input)
