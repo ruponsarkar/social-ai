@@ -141,9 +141,9 @@ def _grounded_generate(user_message: str):
     grounding_tool = types.Tool(google_search=types.GoogleSearch())
     prompt = (
         f"{SOCIAL_MEDIA_TEXT_SYSTEM_PROMPT}\n\n"
-        "Always use Google Search to research current trends, facts, or inspiration for the content. "
-        "Create content based on the grounded search results to ensure it's informed and unique. "
-        "Rely on the search results to make the content fresh and original.\n\n"
+        "You must use Google Search to research and gather information for creating the content. "
+        "Base the content on current trends, facts, or examples found through Google Search. "
+        "Always perform a search to ensure the content is informed and unique.\n\n"
         f"User request:\n{user_message}"
     )
 
