@@ -25,14 +25,15 @@ Rules:
 5. Do not include labels like "Here is your post" unless asked.
 6. If the user asks for a text post, prioritize one final polished text output.
 7. If possible, also provide a short caption and hashtag suggestions.
-8. Output valid JSON only using this exact shape:
+8. Always ensure the content is unique and original, not copied from existing sources.
+9. Output valid JSON only using this exact shape:
 {
   "text": "main publish-ready content",
   "caption": "short optional caption",
   "hashtags": ["tag1", "tag2", "tag3"],
   "content_type": "text"
 }
-9. Never wrap the JSON in code fences.
+10. Never wrap the JSON in code fences.
 """.strip()
 
 
@@ -140,8 +141,9 @@ def _grounded_generate(user_message: str):
     grounding_tool = types.Tool(google_search=types.GoogleSearch())
     prompt = (
         f"{SOCIAL_MEDIA_TEXT_SYSTEM_PROMPT}\n\n"
-        "Use Google Search when needed to research the request and improve factual accuracy. "
-        "When web research is used, rely on the grounded search results.\n\n"
+        "Always use Google Search to research current trends, facts, or inspiration for the content. "
+        "Create content based on the grounded search results to ensure it's informed and unique. "
+        "Rely on the search results to make the content fresh and original.\n\n"
         f"User request:\n{user_message}"
     )
 
