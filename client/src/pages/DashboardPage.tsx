@@ -296,8 +296,11 @@ export const DashboardPage = ({
       </section>
 
       <section className="card legal-links-card">
-        <strong>Meta app setup links</strong>
+        <strong>Navigation & Links</strong>
         <div className="chip-list">
+          <a className="chip link-chip" href="/published-posts">
+            Published Posts
+          </a>
           <a className="chip link-chip" href="/privacy-policy" target="_blank" rel="noreferrer">
             Privacy Policy
           </a>

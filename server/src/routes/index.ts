@@ -3,6 +3,7 @@ import { getDashboardStats } from "../controllers/dashboardController.js";
 import { createKeyword, getKeywords } from "../controllers/keywordController.js";
 import { createJob, deleteJob, getJobs, runSchedulerNow } from "../controllers/jobController.js";
 import { getConnections, upsertConnection } from "../controllers/connectionController.js";
+import { getPublishedPosts } from "../controllers/publishedController.js";
 import {
   googleOAuthCallback,
   metaOAuthCallback,
@@ -23,6 +24,7 @@ router.get("/jobs", getJobs);
 router.post("/jobs", createJob);
 router.post("/jobs/run-now", runSchedulerNow);
 router.delete("/jobs/:id", deleteJob);
+router.get("/published-posts", getPublishedPosts);
 router.get("/connections", getConnections);
 router.post("/connections", upsertConnection);
 router.get("/oauth/meta/start", startMetaOAuth);

@@ -18,7 +18,12 @@ interface AiSourceReference {
 interface GeneratedContent {
   text?: string;
   imageUrl?: string;
+  imagePath?: string;
   videoUrl?: string;
+  caption?: string;
+  hashtags?: string[];
+  improvedPrompt?: string;
+  originalPrompt?: string;
   aiSource?: string;
   aiSources?: AiSourceReference[];
   aiResponsePayload?: unknown;
@@ -37,7 +42,44 @@ interface AiServiceResponse {
   };
 }
 
-const joinKeywords = (keywords: string[]) => keywords.length ? keywords.join(", ") : "general growth";
+const joinKeywords = (keywords: string[]) => keywords.length ? keywords.join(", ") : "general";
+
+const generateImageFromAiService = async (input: GenerateContentInput) => {
+  const prompt = `Generate an image for: ${input.title}. Keywords: ${joinKeywords(input.keywords)}. Style: ${input.promptTemplate}`;
+
+  const response = await axios.post(`${env.AI_SERVICE_URL}/generate-image`, {
+    prompt
+  }, {
+    timeout: 120000
+  });
+
+  const imageUrl = response.data?.image_url;
+  const imagePath = response.data?.image_path;
+  const caption = response.data?.caption;
+  const hashtags = response.data?.hashtags;
+  const improvedPrompt = response.data?.improved_prompt;
+  const originalPrompt = response.data?.original_prompt;
+  const aiSource = response.data?.source;
+
+  if (!imageUrl) {
+    throw new Error("AI service returned an empty image URL");
+  }
+
+  return {
+    imageUrl,
+    imagePath,
+    caption,
+    hashtags,
+    improvedPrompt,
+    originalPrompt,
+    aiSource: aiSource || "gemini_imagen",
+    aiResponsePayload: {
+      provider: "gemini",
+      request: input,
+      response: response.data
+    }
+  };
+};
 
 const buildTextPrompt = (input: GenerateContentInput) => {
   const keywordsText = joinKeywords(input.keywords);
@@ -105,6 +147,16 @@ export const generateContent = async (input: GenerateContentInput): Promise<Gene
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown AI service error";
       console.error(`[ai] Falling back to mock text generation: ${message}`);
+    }
+  }
+
+  if (env.AI_IMAGE_PROVIDER !== "mock" && input.contentType === "image") {
+    try {
+      console.log("creating image from gemini ");
+      return await generateImageFromAiService(input);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown AI service error";
+      console.error(`[ai] Falling back to mock image generation: ${message}`);
     }
   }
 

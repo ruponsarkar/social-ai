@@ -17,7 +17,6 @@ const envSchema = z.object({
   AI_SERVICE_URL: z.string().default("http://127.0.0.1:8000"),
   AI_IMAGE_PROVIDER: z.string().default("mock"),
   AI_VIDEO_PROVIDER: z.string().default("mock"),
-  OPENAI_API_KEY: z.string().optional(),
   META_APP_ID: z.string().default(""),
   META_APP_SECRET: z.string().default(""),
   META_GRAPH_VERSION: z.string().default("v22.0"),

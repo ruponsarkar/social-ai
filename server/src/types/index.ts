@@ -25,6 +25,7 @@ export interface ContentJob {
   next_run_at: string | null;
   generated_text: string | null;
   generated_image_url: string | null;
+  generated_image_path?: string | null;
   generated_video_url: string | null;
   ai_source: string | null;
   ai_response_payload: string | null;
