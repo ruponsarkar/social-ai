@@ -120,7 +120,9 @@ export const processDueJobs = async () => {
             ...job,
             generated_text: generated.text ?? null,
             generated_image_url: generated.imageUrl ?? null,
-            generated_video_url: generated.videoUrl ?? null
+            generated_video_url: generated.videoUrl ?? null,
+            ai_source: generated.aiSource ?? null,
+            ai_response_payload: generated.aiResponsePayload ? JSON.stringify(generated.aiResponsePayload) : null
           },
           platform
         );

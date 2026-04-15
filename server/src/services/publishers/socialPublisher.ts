@@ -19,6 +19,32 @@ const insertLog = async (
   );
 };
 
+const insertPublishedContent = async (
+  jobId: string,
+  platform: Platform,
+  text: string | null,
+  imageUrl: string | null,
+  videoUrl: string | null,
+  aiSource: string | null,
+  aiResponsePayload: unknown,
+  externalPostId: string | null
+) => {
+  await pool.execute(
+    `INSERT INTO published_content (job_id, platform, content_text, content_image_url, content_video_url, ai_source, ai_response_payload, external_post_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      jobId,
+      platform,
+      text,
+      imageUrl,
+      videoUrl,
+      aiSource,
+      aiResponsePayload ? JSON.stringify(aiResponsePayload) : null,
+      externalPostId
+    ]
+  );
+};
+
 export const publishToPlatform = async (job: ContentJob, platform: Platform) => {
   const payload = {
     title: job.title,
@@ -38,6 +64,16 @@ export const publishToPlatform = async (job: ContentJob, platform: Platform) => 
           : await publishToYouTube(job, connection);
 
     await insertLog(job.id, platform, "success", payload, result.externalPostId);
+    await insertPublishedContent(
+      job.id,
+      platform,
+      job.generated_text,
+      job.generated_image_url,
+      job.generated_video_url,
+      job.ai_source,
+      job.ai_response_payload,
+      result.externalPostId
+    );
     return { ok: true, platform, externalPostId: result.externalPostId };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown publishing error";

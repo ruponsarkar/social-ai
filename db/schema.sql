@@ -64,6 +64,19 @@ CREATE TABLE IF NOT EXISTS publish_logs (
   FOREIGN KEY (job_id) REFERENCES content_jobs(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS published_content (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  job_id CHAR(36) NOT NULL,
+  platform ENUM('facebook', 'instagram', 'youtube') NOT NULL,
+  content_text LONGTEXT NULL,
+  content_image_url TEXT NULL,
+  content_video_url TEXT NULL,
+  ai_source VARCHAR(64) NULL,
+  ai_response_payload LONGTEXT NULL,
+  external_post_id VARCHAR(255) NULL,
+  published_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS oauth_states (
   id INT AUTO_INCREMENT PRIMARY KEY,
   provider ENUM('meta', 'google') NOT NULL,
