@@ -41,6 +41,30 @@ Rules:
 10. Never wrap the JSON in code fences.
 """.strip()
 
+SOCIAL_MEDIA_IMAGE_SYSTEM_PROMPT = """
+You are an AI image prompt optimizer for a social media management platform.
+
+Your job is to enhance user image prompts and generate captions for the resulting images.
+
+Rules:
+1. Take the user's basic image idea and transform it into a detailed, professional prompt optimized for AI image generation.
+2. Focus on visual details: lighting, composition, style, colors, mood, and specific visual elements.
+3. Make prompts descriptive but not overly long - aim for 50-100 words.
+4. Ensure prompts are suitable for social media: high-quality, engaging, and brand-appropriate.
+5. Generate a short, catchy caption (under 150 characters) that complements the image.
+6. Suggest 3-5 relevant hashtags for the image content.
+7. Always ensure the content is unique and original.
+8. Output valid JSON only using this exact shape:
+{
+  "improved_prompt": "detailed optimized prompt for image generation",
+  "caption": "short catchy caption for the image",
+  "hashtags": ["tag1", "tag2", "tag3"],
+  "content_type": "image"
+}
+9. Never wrap the JSON in code fences.
+10. Do not include explanations about what you are doing.
+""".strip()
+
 
 def _get_or_create_chat(session_id: str):
     if session_id not in chat_sessions:
@@ -167,6 +191,52 @@ def _grounded_generate(user_message: str):
     return parsed
 
 
+def _improve_image_prompt(user_prompt: str):
+    prompt = (
+        f"{SOCIAL_MEDIA_IMAGE_SYSTEM_PROMPT}\n\n"
+        f"User's basic image idea:\n{user_prompt}\n\n"
+        "Please enhance this prompt and generate a caption."
+    )
+
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+    )
+
+    cleaned = (response.text or "").strip()
+
+    if cleaned.startswith("```"):
+        cleaned = cleaned.strip("`")
+        cleaned = cleaned.replace("json", "", 1).strip()
+
+    try:
+        parsed = json.loads(cleaned)
+    except Exception:
+        # Fallback structure
+        parsed = {
+            "improved_prompt": user_prompt,
+            "caption": user_prompt[:150] if user_prompt else "",
+            "hashtags": [],
+            "content_type": "image"
+        }
+
+    if not isinstance(parsed, dict):
+        parsed = {
+            "improved_prompt": user_prompt,
+            "caption": user_prompt[:150] if user_prompt else "",
+            "hashtags": [],
+            "content_type": "image"
+        }
+
+    return {
+        "improved_prompt": str(parsed.get("improved_prompt", user_prompt)).strip(),
+        "caption": str(parsed.get("caption", "")).strip(),
+        "hashtags": parsed.get("hashtags", []) if isinstance(parsed.get("hashtags", []), list) else [],
+        "content_type": "image",
+        "raw_response": response.text
+    }
+
+
 def generate_response(session_id: str, user_message: str):
     routed = resolve_query(user_message)
     if routed:
@@ -184,14 +254,26 @@ def generate_response(session_id: str, user_message: str):
 
 
 def generate_image(prompt: str, public_url_base: str | None = None):
-    # Use Gemini Imagen
+    # First, improve the prompt and generate caption using Gemini
     try:
-        print(f"Generating image with Gemini: {prompt}")
-        # for m in client.models.list():
-        #     print(m.name)
+        improved_data = _improve_image_prompt(prompt)
+        enhanced_prompt = improved_data["improved_prompt"]
+        caption = improved_data["caption"]
+        hashtags = improved_data["hashtags"]
+        print(f"Original prompt: {prompt}")
+        print(f"Enhanced prompt: {enhanced_prompt}")
+    except Exception as e:
+        print(f"Prompt improvement failed: {str(e)}, using original prompt")
+        enhanced_prompt = prompt
+        caption = prompt[:150] if prompt else ""
+        hashtags = []
+
+    # Use Gemini Imagen with the enhanced prompt
+    try:
+        print(f"Generating image with Gemini: {enhanced_prompt}")
         response = client.models.generate_images(
             model="imagen-4.0-fast-generate-001",
-            prompt=prompt,
+            prompt=enhanced_prompt,
             config=types.GenerateImagesConfig(
                 number_of_images=1,
                 aspect_ratio="1:1",
@@ -216,7 +298,11 @@ def generate_image(prompt: str, public_url_base: str | None = None):
             return {
                 "image_url": image_url,
                 "source": "gemini_imagen",
-                "image_path": str(file_path)
+                "image_path": str(file_path),
+                "caption": caption,
+                "hashtags": hashtags,
+                "improved_prompt": enhanced_prompt,
+                "original_prompt": prompt
             }
         else:
             print("No images generated")
@@ -226,7 +312,11 @@ def generate_image(prompt: str, public_url_base: str | None = None):
         # Fallback to mock
         return {
             "image_url": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80",
-            "source": "mock"
+            "source": "mock",
+            "caption": caption or "Beautiful image",
+            "hashtags": hashtags or ["#image", "#photo"],
+            "improved_prompt": enhanced_prompt,
+            "original_prompt": prompt
         }
 
 

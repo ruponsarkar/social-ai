@@ -119,7 +119,7 @@ export const processDueJobs = async () => {
         const result = await publishToPlatform(
           {
             ...job,
-            generated_text: generated.text ?? null,
+            generated_text: generated.text ?? (generated as any).caption ?? null,
             generated_image_url: generated.imageUrl ?? null,
             generated_image_path: (generated as any).imagePath ?? null,
             generated_video_url: generated.videoUrl ?? null,

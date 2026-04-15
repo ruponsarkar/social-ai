@@ -20,6 +20,10 @@ interface GeneratedContent {
   imageUrl?: string;
   imagePath?: string;
   videoUrl?: string;
+  caption?: string;
+  hashtags?: string[];
+  improvedPrompt?: string;
+  originalPrompt?: string;
   aiSource?: string;
   aiSources?: AiSourceReference[];
   aiResponsePayload?: unknown;
@@ -51,6 +55,10 @@ const generateImageFromAiService = async (input: GenerateContentInput) => {
 
   const imageUrl = response.data?.image_url;
   const imagePath = response.data?.image_path;
+  const caption = response.data?.caption;
+  const hashtags = response.data?.hashtags;
+  const improvedPrompt = response.data?.improved_prompt;
+  const originalPrompt = response.data?.original_prompt;
   const aiSource = response.data?.source;
 
   if (!imageUrl) {
@@ -60,6 +68,10 @@ const generateImageFromAiService = async (input: GenerateContentInput) => {
   return {
     imageUrl,
     imagePath,
+    caption,
+    hashtags,
+    improvedPrompt,
+    originalPrompt,
     aiSource: aiSource || "gemini_imagen",
     aiResponsePayload: {
       provider: "gemini",
