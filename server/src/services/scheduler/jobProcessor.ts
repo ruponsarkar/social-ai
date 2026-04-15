@@ -75,11 +75,12 @@ export const processDueJobs = async () => {
 
       await pool.execute(
         `UPDATE content_jobs
-         SET generated_text = ?, generated_image_url = ?, generated_video_url = ?, ai_source = ?, ai_response_payload = ?
+         SET generated_text = ?, generated_image_url = ?, generated_image_path = ?, generated_video_url = ?, ai_source = ?, ai_response_payload = ?
          WHERE id = ?`,
         [
           generated.text ?? null,
           generated.imageUrl ?? null,
+          (generated as any).imagePath ?? null,
           generated.videoUrl ?? null,
           generated.aiSource ?? null,
           generated.aiResponsePayload ? JSON.stringify(generated.aiResponsePayload) : null,
@@ -120,6 +121,7 @@ export const processDueJobs = async () => {
             ...job,
             generated_text: generated.text ?? null,
             generated_image_url: generated.imageUrl ?? null,
+            generated_image_path: (generated as any).imagePath ?? null,
             generated_video_url: generated.videoUrl ?? null,
             ai_source: generated.aiSource ?? null,
             ai_response_payload: generated.aiResponsePayload ? JSON.stringify(generated.aiResponsePayload) : null

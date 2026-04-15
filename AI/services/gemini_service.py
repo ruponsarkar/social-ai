@@ -1,9 +1,12 @@
 import os
 import json
+import uuid
+from pathlib import Path
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 from services.router import resolve_query
+from io import BytesIO
 
 
 load_dotenv()
@@ -11,6 +14,8 @@ load_dotenv()
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 chat_sessions = {}
+PUBLIC_IMAGE_DIR = Path(__file__).resolve().parents[1] / "public" / "images"
+PUBLIC_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
 
 SOCIAL_MEDIA_TEXT_SYSTEM_PROMPT = """
 You are an AI content writer for a social media management platform.
@@ -176,6 +181,53 @@ def generate_response(session_id: str, user_message: str):
         }
 
     return _grounded_generate(user_message)
+
+
+def generate_image(prompt: str, public_url_base: str | None = None):
+    # Use Gemini Imagen
+    try:
+        print(f"Generating image with Gemini: {prompt}")
+        # for m in client.models.list():
+        #     print(m.name)
+        response = client.models.generate_images(
+            model="imagen-4.0-fast-generate-001",
+            prompt=prompt,
+            config=types.GenerateImagesConfig(
+                number_of_images=1,
+                aspect_ratio="1:1",
+                person_generation="allow_adult"
+            )
+        )
+        print("Image generation response received")
+
+        if response.generated_images:
+            image = response.generated_images[0]
+            image_bytes = image.image.image_bytes
+            filename = f"{uuid.uuid4().hex}.png"
+            file_path = PUBLIC_IMAGE_DIR / filename
+            file_path.write_bytes(image_bytes)
+
+            if public_url_base:
+                image_url = f"{public_url_base.rstrip('/')}/public/images/{filename}"
+            else:
+                image_url = f"/public/images/{filename}"
+
+            print(f"Image generated successfully and saved to {file_path}")
+            return {
+                "image_url": image_url,
+                "source": "gemini_imagen",
+                "image_path": str(file_path)
+            }
+        else:
+            print("No images generated")
+            raise Exception("No image generated")
+    except Exception as e:
+        print(f"Gemini image generation failed: {str(e)}")
+        # Fallback to mock
+        return {
+            "image_url": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80",
+            "source": "mock"
+        }
 
 
 def stream_response(session_id: str, user_message: str):

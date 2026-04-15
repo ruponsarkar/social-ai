@@ -1,4 +1,6 @@
 import axios from "axios";
+import { readFileSync } from "fs";
+import FormData from "form-data";
 import { env } from "../../config/env.js";
 import type { ContentJob } from "../../types/index.js";
 import type { PlatformConnection } from "./connectionService.js";
@@ -18,6 +20,26 @@ const postForm = async <T>(path: string, form: Record<string, string | number | 
     headers: {
       "Content-Type": "application/x-www-form-urlencoded"
     }
+  });
+
+  return response.data;
+};
+
+const postMultipart = async <T>(path: string, form: Record<string, string | number | boolean | Buffer | undefined>) => {
+  const formData = new FormData();
+
+  for (const [key, value] of Object.entries(form)) {
+    if (value !== undefined && value !== null) {
+      if (Buffer.isBuffer(value)) {
+        formData.append(key, value, { filename: "image.png" });
+      } else {
+        formData.append(key, String(value));
+      }
+    }
+  }
+
+  const response = await axios.post<T>(`${META_BASE_URL}${path}`, formData, {
+    headers: formData.getHeaders()
   });
 
   return response.data;
@@ -59,16 +81,34 @@ export const publishToFacebook = async (job: ContentJob, connection: PlatformCon
   }
 
   if (job.content_type === "image") {
-    if (!job.generated_image_url) {
-      throw new Error("Facebook image publishing requires generated_image_url");
+    if (!job.generated_image_url && !job.generated_image_path) {
+      throw new Error("Facebook image publishing requires generated_image_url or generated_image_path");
     }
 
-    const data = await postForm<{ post_id?: string; id?: string }>(`/${pageId}/photos`, {
+    const form: Record<string, string | number | boolean | Buffer | undefined> = {
       access_token: accessToken,
-      url: job.generated_image_url,
       caption: job.generated_text ?? job.title,
       published: true
-    });
+    };
+
+    // If local path is available, read and upload file directly; otherwise use URL
+    if (job.generated_image_path) {
+      try {
+        const imageBuffer = readFileSync(job.generated_image_path);
+        form.source = imageBuffer;
+      } catch (error) {
+        console.warn(`Failed to read local image from ${job.generated_image_path}, falling back to URL`);
+        if (job.generated_image_url) {
+          form.url = job.generated_image_url;
+        }
+      }
+    } else if (job.generated_image_url) {
+      form.url = job.generated_image_url;
+    }
+
+    const data = form.source
+      ? await postMultipart<{ post_id?: string; id?: string }>(`/${pageId}/photos`, form)
+      : await postForm<{ post_id?: string; id?: string }>(`/${pageId}/photos`, form as Record<string, string | number | boolean | undefined>);
 
     return { externalPostId: data.post_id ?? data.id ?? "facebook_photo_created", raw: data };
   }
@@ -124,11 +164,12 @@ export const publishToInstagram = async (job: ContentJob, connection: PlatformCo
   };
 
   if (job.content_type === "image") {
-    if (!job.generated_image_url) {
-      throw new Error("Instagram image publishing requires generated_image_url");
+    if (!job.generated_image_url && !job.generated_image_path) {
+      throw new Error("Instagram image publishing requires generated_image_url or generated_image_path");
     }
 
-    containerRequest.image_url = job.generated_image_url;
+    // For Instagram, always use the public URL (generated_image_url)
+    containerRequest.image_url = job.generated_image_url || "";
   }
 
   if (job.content_type === "video") {
