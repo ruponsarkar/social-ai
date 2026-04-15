@@ -121,6 +121,25 @@ select {
   font-weight: 700;
 }
 
+.page-button {
+  border: 1px solid #d5dee6;
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: #fff;
+  color: #15202b;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.page-button:hover:not(:disabled) {
+  background: #f8f9fa;
+}
+
+.page-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .chip-list {
   display: flex;
   flex-wrap: wrap;

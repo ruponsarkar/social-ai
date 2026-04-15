@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "./lib/api";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LegalPage } from "./pages/LegalPage";
+import { PublishedPostsPage } from "./pages/PublishedPostsPage";
 
 type DashboardStats = {
   totalKeywords: number;
@@ -203,6 +204,10 @@ export default function App() {
         ]}
       />
     );
+  }
+
+  if (pathname === "/published-posts") {
+    return <PublishedPostsPage />;
   }
 
   return (
