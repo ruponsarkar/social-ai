@@ -45,7 +45,8 @@ interface AiServiceResponse {
 const joinKeywords = (keywords: string[]) => keywords.length ? keywords.join(", ") : "general";
 
 const generateImageFromAiService = async (input: GenerateContentInput) => {
-  const prompt = `Generate an image for: ${input.title}. Keywords: ${joinKeywords(input.keywords)}. Style: ${input.promptTemplate}`;
+  // const prompt = `Generate an image for: ${input.title}. Keywords: ${joinKeywords(input.keywords)}. Style: ${input.promptTemplate}`;
+  const prompt = `${input.promptTemplate}`;
 
   const response = await axios.post(`${env.AI_SERVICE_URL}/generate-image`, {
     prompt
