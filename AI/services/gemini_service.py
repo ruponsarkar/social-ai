@@ -237,6 +237,52 @@ def _improve_image_prompt(user_prompt: str):
     }
 
 
+def _generate_caption_only(user_prompt: str):
+    """Generate a short catchy caption for an image prompt without enhancing the prompt itself."""
+    prompt = (
+        "You are a social media caption writer. Generate a short, catchy caption (under 150 characters) "
+        "for an image that would be generated from this prompt. Make it engaging and suitable for social media.\n\n"
+        f"Image prompt: {user_prompt}\n\n"
+        "Output valid JSON only using this exact shape:\n"
+        "{\n"
+        '  "caption": "short catchy caption for the image",\n'
+        '  "hashtags": ["tag1", "tag2", "tag3"]\n'
+        "}\n"
+        "Never wrap the JSON in code fences."
+    )
+
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+    )
+
+    cleaned = (response.text or "").strip()
+
+    if cleaned.startswith("```"):
+        cleaned = cleaned.strip("`")
+        cleaned = cleaned.replace("json", "", 1).strip()
+
+    try:
+        parsed = json.loads(cleaned)
+    except Exception:
+        # Fallback structure
+        parsed = {
+            "caption": user_prompt[:150] if user_prompt else "",
+            "hashtags": []
+        }
+
+    if not isinstance(parsed, dict):
+        parsed = {
+            "caption": user_prompt[:150] if user_prompt else "",
+            "hashtags": []
+        }
+
+    return {
+        "caption": str(parsed.get("caption", user_prompt[:150] if user_prompt else "")).strip(),
+        "hashtags": parsed.get("hashtags", []) if isinstance(parsed.get("hashtags", []), list) else []
+    }
+
+
 def generate_response(session_id: str, user_message: str):
     routed = resolve_query(user_message)
     if routed:
@@ -253,20 +299,44 @@ def generate_response(session_id: str, user_message: str):
     return _grounded_generate(user_message)
 
 
-def generate_image(prompt: str, public_url_base: str | None = None):
-    # First, improve the prompt and generate caption using Gemini
-    try:
-        improved_data = _improve_image_prompt(prompt)
-        enhanced_prompt = improved_data["improved_prompt"]
-        caption = improved_data["caption"]
-        hashtags = improved_data["hashtags"]
-        print(f"Original prompt: {prompt}")
-        print(f"Enhanced prompt: {enhanced_prompt}")
-    except Exception as e:
-        print(f"Prompt improvement failed: {str(e)}, using original prompt")
+def generate_image(prompt: str, public_url_base: str | None = None, enhance_prompt: bool = True):
+    # Optionally improve the prompt and generate caption using Gemini
+    enhanced_prompt = prompt
+    caption = ""
+    hashtags = []
+    
+    if enhance_prompt:
+        try:
+            improved_data = _improve_image_prompt(prompt)
+            enhanced_prompt = improved_data["improved_prompt"]
+            caption = improved_data["caption"]
+            hashtags = improved_data["hashtags"]
+            print(f"Original prompt: {prompt}")
+            print(f"Enhanced prompt: {enhanced_prompt}")
+        except Exception as e:
+            print(f"Prompt improvement failed: {str(e)}, using original prompt")
+            enhanced_prompt = prompt
+            # Generate caption even if enhancement fails
+            try:
+                caption_data = _generate_caption_only(prompt)
+                caption = caption_data["caption"]
+                hashtags = caption_data["hashtags"]
+            except Exception as caption_error:
+                print(f"Caption generation also failed: {str(caption_error)}")
+                caption = prompt[:150] if prompt else ""
+                hashtags = []
+    else:
+        print(f"Using raw prompt (enhancement disabled): {prompt}")
         enhanced_prompt = prompt
-        caption = prompt[:150] if prompt else ""
-        hashtags = []
+        # Still generate AI caption for raw prompts
+        try:
+            caption_data = _generate_caption_only(prompt)
+            caption = caption_data["caption"]
+            hashtags = caption_data["hashtags"]
+        except Exception as e:
+            print(f"Caption generation failed for raw prompt: {str(e)}")
+            caption = prompt[:150] if prompt else ""
+            hashtags = []
 
     # Use Gemini Imagen with the enhanced prompt
     try:

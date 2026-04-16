@@ -23,6 +23,7 @@ export const createJob = async (req: Request, res: Response) => {
     scheduledAt,
     publishEveryOtherDay,
     repeatInterval,
+    enhancePrompt,
     keywordIds
   } = req.body as {
     title: string;
@@ -32,6 +33,7 @@ export const createJob = async (req: Request, res: Response) => {
     scheduledAt: string;
     publishEveryOtherDay: boolean;
     repeatInterval?: RepeatInterval;
+    enhancePrompt?: boolean;
     keywordIds: number[];
   };
 
@@ -40,12 +42,13 @@ export const createJob = async (req: Request, res: Response) => {
 
   await pool.execute(
     `INSERT INTO content_jobs
-     (id, title, content_type, target_platforms, status, prompt_template, scheduled_at, publish_every_other_day, repeat_interval, next_run_at)
-     VALUES (?, ?, ?, ?, 'scheduled', ?, ?, ?, ?, ?)`,
+     (id, title, content_type, enhance_prompt, target_platforms, status, prompt_template, scheduled_at, publish_every_other_day, repeat_interval, next_run_at)
+     VALUES (?, ?, ?, ?, ?, 'scheduled', ?, ?, ?, ?, ?)`,
     [
       id,
       title,
       contentType,
+      enhancePrompt ?? true,
       JSON.stringify(targetPlatforms),
       promptTemplate,
       scheduledAt,

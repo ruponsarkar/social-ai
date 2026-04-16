@@ -7,6 +7,7 @@ interface GenerateContentInput {
   promptTemplate: string;
   keywords: string[];
   contentType: ContentType;
+  enhancePrompt?: boolean;
 }
 
 interface AiSourceReference {
@@ -49,7 +50,8 @@ const generateImageFromAiService = async (input: GenerateContentInput) => {
   const prompt = `${input.promptTemplate}`;
 
   const response = await axios.post(`${env.AI_SERVICE_URL}/generate-image`, {
-    prompt
+    prompt,
+    enhance_prompt: input.enhancePrompt ?? true
   }, {
     timeout: 120000
   });

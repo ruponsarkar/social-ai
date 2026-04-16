@@ -85,7 +85,8 @@ export const DashboardPage = ({
     scheduledAt: "",
     repeatInterval: "none" as RepeatInterval,
     keywordIds: [] as number[],
-    targetPlatforms: ["facebook"] as string[]
+    targetPlatforms: ["facebook"] as string[],
+    enhancePrompt: true
   });
   const [connectionForm, setConnectionForm] = useState({
     platform: "facebook",
@@ -182,7 +183,8 @@ export const DashboardPage = ({
       scheduledAt: "",
       repeatInterval: "none",
       keywordIds: [],
-      targetPlatforms: ["facebook"]
+      targetPlatforms: ["facebook"],
+      enhancePrompt: true
     });
     await onRefresh();
   };
@@ -403,6 +405,20 @@ export const DashboardPage = ({
               <option value="every_day">Post Every day</option>
               <option value="every_other_day">Post every alternate day</option>
             </select>
+
+            {jobForm.contentType === "image" && (
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <input
+                  type="checkbox"
+                  id="enhance-prompt"
+                  checked={jobForm.enhancePrompt}
+                  onChange={(event) => setJobForm({ ...jobForm, enhancePrompt: event.target.checked })}
+                />
+                <label htmlFor="enhance-prompt" style={{ margin: 0, cursor: "pointer" }}>
+                  Enhance prompt with AI (optimize for better image generation)
+                </label>
+              </div>
+            )}
 
             <div>
               <p className="subheading">Platforms</p>

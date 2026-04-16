@@ -15,6 +15,7 @@ export interface ContentJob {
   id: string;
   title: string;
   content_type: ContentType;
+  enhance_prompt: number;
   target_platforms: Platform[];
   status: JobStatus;
   prompt_template: string;

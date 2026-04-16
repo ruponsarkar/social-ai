@@ -26,6 +26,7 @@ type Job = {
   created_at: string;
   target_platforms: string[];
   prompt_template: string;
+  enhance_prompt?: number;
   generated_text?: string | null;
   generated_image_url?: string | null;
   generated_video_url?: string | null;
