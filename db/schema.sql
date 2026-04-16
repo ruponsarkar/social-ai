@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS content_jobs (
   id CHAR(36) PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   content_type ENUM('text', 'image', 'video') NOT NULL,
+  enhance_prompt TINYINT(1) NOT NULL DEFAULT 1,
   target_platforms JSON NOT NULL,
   status ENUM('draft', 'scheduled', 'processing', 'published', 'failed') NOT NULL DEFAULT 'draft',
   prompt_template TEXT NOT NULL,

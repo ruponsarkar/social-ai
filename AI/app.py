@@ -29,6 +29,7 @@ class ChatRequest(BaseModel):
 
 class ImageRequest(BaseModel):
     prompt: str
+    enhance_prompt: bool = True
 
 @app.get("/")
 def home():
@@ -65,7 +66,11 @@ def chat_stream(request: ChatRequest):
 def generate_image_endpoint(image_request: ImageRequest, http_request: Request):
     try:
         public_url_base = str(http_request.base_url).rstrip("/")
-        result = generate_image(image_request.prompt, public_url_base=public_url_base)
+        result = generate_image(
+            image_request.prompt,
+            public_url_base=public_url_base,
+            enhance_prompt=image_request.enhance_prompt
+        )
         return result
     except Exception as e:
         return {"error": str(e)}

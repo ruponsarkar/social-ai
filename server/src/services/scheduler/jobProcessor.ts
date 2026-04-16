@@ -70,7 +70,8 @@ export const processDueJobs = async () => {
         title: job.title,
         promptTemplate: job.prompt_template,
         keywords: keywordList,
-        contentType: job.content_type
+        contentType: job.content_type,
+        enhancePrompt: job.enhance_prompt === 1
       });
 
       await pool.execute(
